@@ -1,0 +1,6 @@
+{
+  "name": "PDF Intellect AI",
+  "description": "AI Chatbot that can summarize PDF documents and answer user questions in real-time.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
