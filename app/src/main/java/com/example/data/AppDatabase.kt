@@ -37,10 +37,11 @@ interface MessageDao {
     suspend fun deleteMessagesForDocument(documentId: Int)
 }
 
-@Database(entities = [DocumentEntity::class, MessageEntity::class], version = 1, exportSchema = false)
+@Database(entities = [DocumentEntity::class, MessageEntity::class, UserEntity::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun documentDao(): DocumentDao
     abstract fun messageDao(): MessageDao
+    abstract fun userDao(): UserDao
 
     companion object {
         @Volatile
@@ -52,7 +53,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "pdf_assistant_database"
-                ).build()
+                )
+                .fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }
