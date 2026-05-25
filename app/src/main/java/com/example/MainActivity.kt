@@ -431,7 +431,7 @@ fun PdfAssistantApp(viewModel: PdfViewModel = viewModel()) {
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Text(
-                            text = "Insight.",
+                            text = "LUNEXIX.",
                             fontSize = 32.sp,
                             fontWeight = FontWeight.Black,
                             fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
@@ -689,7 +689,7 @@ fun EmptyStateView(
         Spacer(modifier = Modifier.height(14.dp))
 
         Text(
-            text = "INTELLECT.",
+            text = "LUNEXIX.",
             fontSize = 38.sp,
             fontWeight = FontWeight.Black,
             fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
@@ -1531,7 +1531,7 @@ fun AuthScreen(
         ) {
             // Header Section
             Text(
-                text = "Insight.",
+                text = "LUNEXIX.",
                 fontSize = 54.sp,
                 fontWeight = FontWeight.Black,
                 fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
