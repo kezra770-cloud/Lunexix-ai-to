@@ -122,23 +122,44 @@ class PdfRepository(private val db: AppDatabase) {
         apiKey: String,
         document: DocumentEntity,
         question: String,
-        history: List<MessageEntity>
+        history: List<MessageEntity>,
+        personality: String = "it_consultant"
     ): String = withContext(Dispatchers.IO) {
-        val systemInstructionText = """
-            You are a helpful, expert AI assistant.
-            You are helping the user query the following document: "${document.name}".
-            
-            Here is the dense indexed text from the document:
-            --- START DOCUMENT TEXT ---
-            ${document.extractedText}
-            --- END DOCUMENT TEXT ---
-            
-            Guidelines:
-            1. Rely STRICTLY on the document text provided above to answer the user's questions.
-            2. If the user's question cannot be answered using the provided text, state that plainly and truthfully rather than making up answers.
-            3. Write clear, detailed, and visually structured responses with markdown formatting (bullet points, bold texts).
-            4. Keep the tone helpful, professional, and objective.
-        """.trimIndent()
+        val isGeneralChat = document.extractedText == "GENERAL_PURPOSE_AI_CHAT_NO_DOCUMENT"
+
+        val personalityInstructions = when (personality) {
+            "business_analyst" -> "Adopt the persona of a Business Analyst & Executive Advisor at LUNEXIX. Be extremely concise and structured, utilize business metrics (KPIs, ROI, cost effectiveness, market viability), focus on big-picture strategic goals, risk assessment, and high-level takeaways."
+            "creative_explainer" -> "Adopt the persona of a Friendly Creative Technologist. Break down complex, dry technical details into approachable, narrative explanations with elegant real-life analogies, clean examples, and warm encouraging feedback."
+            else -> "Adopt the persona of a Senior IT & full-stack Software Consultant at LUNEXIX. Use deep technical precision, explain underlying system architectures or DevOps workflows, suggest relevant code snippets/specs, and show system patterns in custom ASCII or visual layout."
+        }
+
+        val systemInstructionText = if (isGeneralChat) {
+            """
+                You are a highly versatile, expert general-purpose AI chatbot powered by the LUNEXIX document & knowledge intelligence ecosystem.
+                
+                Guidelines:
+                1. $personalityInstructions
+                2. Write clear, detailed, and visually structured responses with markdown formatting (bullet points, bold text).
+                3. Keep the tone helpful, professional, and expert.
+                4. Answer any general question to the best of your knowledge. Feel free to write code, provide scripts, list specs, or debug queries.
+            """.trimIndent()
+        } else {
+            """
+                You are a helpful, expert AI assistant helping the user query the document: "${document.name}".
+                
+                Here is the dense indexed text from the document:
+                --- START DOCUMENT TEXT ---
+                ${document.extractedText}
+                --- END DOCUMENT TEXT ---
+                
+                Guidelines:
+                1. $personalityInstructions
+                2. Rely STRICTLY on the document text provided above to answer the user's questions.
+                3. If the user's question cannot be answered using the provided text, state that plainly and truthfully rather than making up answers.
+                4. Write clear, detailed, and visually structured responses with markdown formatting (bullet points, bold texts).
+                5. Keep the tone helpful, professional, and objective.
+            """.trimIndent()
+        }
 
         // Create the alternating contents list for Gemini chat history
         val apiContents = mutableListOf<Content>()

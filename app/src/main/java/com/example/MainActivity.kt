@@ -229,6 +229,52 @@ class PdfViewModel(application: Application) : AndroidViewModel(application) {
         _errorMessage.value = null
     }
 
+    private val _selectedPersonality = MutableStateFlow("it_consultant")
+    val selectedPersonality: StateFlow<String> = _selectedPersonality.asStateFlow()
+
+    fun selectPersonality(personality: String) {
+        _selectedPersonality.value = personality
+    }
+
+    fun launchGeneralSandboxChat() {
+        viewModelScope.launch {
+            _isAnalyzing.value = true
+            _analysisProgress.value = "Launching LUNEXIX Chat Sandbox..."
+            try {
+                // Check if any existing sandbox doc
+                var sandboxDoc = _documentsList.value.firstOrNull { it.extractedText == "GENERAL_PURPOSE_AI_CHAT_NO_DOCUMENT" }
+                if (sandboxDoc == null) {
+                    val doc = DocumentEntity(
+                        name = "Universal LUNEXIX AI Sandbox",
+                        summary = "Your interactive, general-purpose IT and business AI chat space. Powered by LUNEXIX full-stack intellect platform.",
+                        extractedText = "GENERAL_PURPOSE_AI_CHAT_NO_DOCUMENT",
+                        pageCount = 0,
+                        fileSize = 0L
+                    )
+                    val insertedId = repository.insertDocument(doc)
+                    sandboxDoc = doc.copy(id = insertedId.toInt())
+                    // Automatically add the welcoming introductory system message
+                    repository.insertMessage(
+                        MessageEntity(
+                            documentId = sandboxDoc.id,
+                            role = "model",
+                            content = "### 🚀 Welcome to the Universal AI Sandbox by LUNEXIX.\n\nI am your general-purpose AI chatbot assistant. You can ask me any professional IT question, request full-stack software code, outline specifications, or seek general guidance.\n\n**Select an AI Personality above** to change my analytical tone and try sending a message now!"
+                        )
+                    )
+                }
+                
+                _activeDocument.value = sandboxDoc
+                _errorMessage.value = null
+            } catch (e: Exception) {
+                Log.e("PdfViewModel", "Sandbox launch failed", e)
+                _errorMessage.value = "Failed to launch sandbox: ${e.message}"
+            } finally {
+                _isAnalyzing.value = false
+                _analysisProgress.value = ""
+            }
+        }
+    }
+
     fun unloadDocument() {
         _activeDocument.value = null
         _errorMessage.value = null
@@ -295,7 +341,7 @@ class PdfViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 // Call repository to process and save conversation
-                repository.askQuestion(apiKey, doc, questionText, _messagesList.value)
+                repository.askQuestion(apiKey, doc, questionText, _messagesList.value, _selectedPersonality.value)
                 _errorMessage.value = null
             } catch (e: Exception) {
                 Log.e("PdfViewModel", "Failed to get AI reply", e)
@@ -531,19 +577,23 @@ fun PdfAssistantApp(viewModel: PdfViewModel = viewModel()) {
                 .padding(innerPadding)
         ) {
             // Main Interactive Views
+            val selectedPersonality by viewModel.selectedPersonality.collectAsStateWithLifecycle()
             if (activeDocument == null) {
                 EmptyStateView(
                     username = currentUser ?: "User",
                     documents = documentsList,
                     onSelectDocument = { viewModel.selectDocument(it) },
                     onUploadClicked = { pdfPickerLauncher.launch("application/pdf") },
-                    onDeleteDocument = { viewModel.deleteDocument(it) }
+                    onDeleteDocument = { viewModel.deleteDocument(it) },
+                    onLaunchSandbox = { viewModel.launchGeneralSandboxChat() }
                 )
             } else {
                 ChatScreen(
                     document = activeDocument!!,
                     messages = messagesList,
                     isAsking = isAsking,
+                    selectedPersonality = selectedPersonality,
+                    onSelectPersonality = { viewModel.selectPersonality(it) },
                     onAskQuestion = { viewModel.askQuestion(it) },
                     onCloseDocument = { viewModel.unloadDocument() }
                 )
@@ -643,7 +693,8 @@ fun EmptyStateView(
     documents: List<DocumentEntity>,
     onSelectDocument: (DocumentEntity) -> Unit,
     onUploadClicked: () -> Unit,
-    onDeleteDocument: (Int) -> Unit
+    onDeleteDocument: (Int) -> Unit,
+    onLaunchSandbox: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -700,7 +751,7 @@ fun EmptyStateView(
         )
 
         Text(
-            text = "Extract comprehensive text summaries and ask questions in real-time from any PDF file (renders up to 12 pages).",
+            text = "LUNEXIX Document Intelligence & Interactive AI Hub. Process manuals, design specifications, or converse freely with the universal sandbox.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -710,7 +761,7 @@ fun EmptyStateView(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Large tactile neobrutalist action button
+        // Large tactile neobrutalist action button for PDF
         Box(
             modifier = Modifier
                 .fillMaxWidth(0.88f)
@@ -742,6 +793,44 @@ fun EmptyStateView(
                     letterSpacing = 0.5.sp,
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Secondary tactile button for General chatbot sandbox
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.88f)
+                .padding(bottom = 6.dp, end = 6.dp)
+                .clickable { onLaunchSandbox() }
+                .background(MaterialTheme.colorScheme.secondary, shape = RoundedCornerShape(16.dp))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .offset(x = (-4).dp, y = (-4).dp)
+                    .background(MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(16.dp))
+                    .border(2.5.dp, MaterialTheme.colorScheme.secondary, shape = RoundedCornerShape(16.dp))
+                    .padding(horizontal = 24.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Forum,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "OPEN GENERAL AI SANDBOX",
+                    fontWeight = FontWeight.Black,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                    letterSpacing = 0.5.sp,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
             }
         }
@@ -846,6 +935,8 @@ fun ChatScreen(
     document: DocumentEntity,
     messages: List<MessageEntity>,
     isAsking: Boolean,
+    selectedPersonality: String,
+    onSelectPersonality: (String) -> Unit,
     onAskQuestion: (String) -> Unit,
     onCloseDocument: () -> Unit
 ) {
@@ -854,8 +945,15 @@ fun ChatScreen(
     var inputMessage by remember { mutableStateOf("") }
     val keyboardController = LocalSoftwareKeyboardController.current
 
+    val isSandbox = document.extractedText == "GENERAL_PURPOSE_AI_CHAT_NO_DOCUMENT"
+
     // Suggestions chip row to prompt queries immediately
-    val suggestionChips = listOf(
+    val suggestionChips = if (isSandbox) listOf(
+        "Code clean M3 button",
+        "Troubleshoot API timeout",
+        "Outline SaaS IT architecture",
+        "Explain AI Agents simply"
+    ) else listOf(
         "Summarize core insights",
         "What are the main takeaways?",
         "Key statistics & numbers",
@@ -885,15 +983,18 @@ fun ChatScreen(
                 modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Bold PDF icon bloc
+                // Bold PDF icon block
                 Box(
                     modifier = Modifier
                         .size(38.dp)
-                        .background(Color(0xFF6750A4), shape = RoundedCornerShape(10.dp)),
+                        .background(
+                            if (isSandbox) MaterialTheme.colorScheme.secondary else Color(0xFF6750A4), 
+                            shape = RoundedCornerShape(10.dp)
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "PDF",
+                        text = if (isSandbox) "AIUB" else "PDF",
                         color = Color.White,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Black,
@@ -911,7 +1012,7 @@ fun ChatScreen(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "${document.pageCount} Pages • ${formatFileSize(document.fileSize)}",
+                        text = if (isSandbox) "Conversational Sandbox Mode" else "${document.pageCount} Pages • ${formatFileSize(document.fileSize)}",
                         fontSize = 10.sp,
                         color = Color(0xFF49454F).copy(alpha = 0.7f),
                         fontWeight = FontWeight.Bold
@@ -948,6 +1049,57 @@ fun ChatScreen(
             }
         }
 
+        // AI Personality Selector Row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "AI TONE:",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                modifier = Modifier.padding(end = 4.dp)
+            )
+
+            val personalities = listOf(
+                Triple("it_consultant", "💻 IT Specialist", MaterialTheme.colorScheme.primary),
+                Triple("business_analyst", "📊 Business Analyst", Color(0xFF0F9D58)),
+                Triple("creative_explainer", "🎨 Creative Technologist", Color(0xFFE65100))
+            )
+
+            personalities.forEach { (id, label, accentColor) ->
+                val isSelected = selectedPersonality == id
+                Box(
+                    modifier = Modifier
+                        .clickable { onSelectPersonality(id) }
+                        .background(
+                            color = if (isSelected) accentColor.copy(alpha = 0.15f) else Color.Transparent,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .border(
+                            width = 1.5.dp,
+                            color = if (isSelected) accentColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = label,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        color = if (isSelected) accentColor else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
         // Lazy lists containing actual responses with custom TL;DR card at the very top
         LazyColumn(
             state = listState,
@@ -959,62 +1111,64 @@ fun ChatScreen(
             contentPadding = PaddingValues(bottom = 12.dp)
         ) {
             // First item: TL;DR Watermark Summary block from Theme HTML
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp, horizontal = 4.dp)
-                ) {
-                    // Huge background typography watermark
-                    Text(
-                        text = "TL;DR",
-                        fontSize = 72.sp,
-                        fontWeight = FontWeight.Black,
-                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                        letterSpacing = (-4).sp,
-                        color = Color(0xFF1C1B1F).copy(alpha = 0.08f),
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .offset(y = (-12).dp)
-                    )
-                    
-                    // Neobrutalist custom container: bg-[#EADDFF] border-b-4 border-r-4 border-[#6750A4]
+            if (!isSandbox) {
+                item {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 18.dp, end = 6.dp, bottom = 6.dp)
-                            .background(Color(0xFF6750A4), shape = RoundedCornerShape(24.dp))
+                            .padding(vertical = 12.dp, horizontal = 4.dp)
                     ) {
-                        Column(
+                        // Huge background typography watermark
+                        Text(
+                            text = "TL;DR",
+                            fontSize = 72.sp,
+                            fontWeight = FontWeight.Black,
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                            letterSpacing = (-4).sp,
+                            color = Color(0xFF1C1B1F).copy(alpha = 0.08f),
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .offset(y = (-12).dp)
+                        )
+                        
+                        // Neobrutalist custom container: bg-[#EADDFF] border-b-4 border-r-4 border-[#6750A4]
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .offset(x = (-4).dp, y = (-4).dp)
-                                .background(Color(0xFFEADDFF), shape = RoundedCornerShape(24.dp))
-                                .border(2.5.dp, Color(0xFF6750A4), shape = RoundedCornerShape(24.dp))
-                                .padding(18.dp)
+                                .padding(top = 18.dp, end = 6.dp, bottom = 6.dp)
+                                .background(Color(0xFF6750A4), shape = RoundedCornerShape(24.dp))
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.Summarize,
-                                    tint = Color(0xFF21005D),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "DOCUMENT SYNOPSIS",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Black,
-                                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                                    color = Color(0xFF21005D),
-                                    letterSpacing = 0.5.sp
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .offset(x = (-4).dp, y = (-4).dp)
+                                    .background(Color(0xFFEADDFF), shape = RoundedCornerShape(24.dp))
+                                    .border(2.5.dp, Color(0xFF6750A4), shape = RoundedCornerShape(24.dp))
+                                    .padding(18.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Summarize,
+                                        tint = Color(0xFF21005D),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "DOCUMENT SYNOPSIS",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Black,
+                                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                        color = Color(0xFF21005D),
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+                                MarkdownText(
+                                    text = document.summary,
+                                    color = Color(0xFF21005D)
                                 )
                             }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            MarkdownText(
-                                text = document.summary,
-                                color = Color(0xFF21005D)
-                            )
                         }
                     }
                 }
